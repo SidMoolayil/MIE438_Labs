@@ -1,0 +1,1554 @@
+*** EVALUATION ***
+ANSI-C/cC++ Compiler for HC12 V-5.0.38 Build 9056, Feb 26 2009
+
+    1:  /*-----------------------------------------------------------------------*/
+    2:  /* MMC/SDC (in SPI mode) control module  (C)ChaN, 2007                   */
+    3:  /*-----------------------------------------------------------------------*/
+    4:  /* Only rcvr_spi(), xmit_spi(), disk_timerproc() and some macros         */
+    5:  /* are platform dependent.                                               */
+    6:  /*-----------------------------------------------------------------------*/
+    7:  
+    8:  /*
+    9:   * This file was modified from a Stellarisware example. The Stellarisware
+   10:   * code was was modified from a sample available from the FatFs
+   11:   * web site http://elm-chan.org/fsw/ff/00index_e.html. 
+   12:   *          http://elm-chan.org/fsw_e.html
+   13:   * Modified by Jonathan Valvano to run on a 9S12
+   14:   * April 27, 2011
+   15:   */
+   16:  
+   17:  // PS7-PS4 SPI0 connected to SDC 
+   18:  // PS7 is SS   to SDC CS       pin 1
+   19:  // PS6 is SCLK to SDC clock    pin 5
+   20:  // PS5 is MOSI to SDC data in  pin 2
+   21:  // PS4 is MISO to SDC data out pin 7
+   22:  // SDC pin 4 3.3V  power
+   23:  // SDC pin 6 ground
+   24:  // SDC pin 3 ground
+   25:  // SDC pin 8 open or 10k pullup to 3.3V 
+   26:  // SDC pin 9 open 
+   27:  #include <hidef.h>      /* common defines and macros */
+   28:  #include "derivative.h"      /* derivative-specific definitions */
+   29:  #include "edisk.h"
+   30:  
+   31:  /* Definitions for MMC/SDC command */
+   32:  #define CMD0    (0x40+0)    /* GO_IDLE_STATE */
+   33:  #define CMD1    (0x40+1)    /* SEND_OP_COND */
+   34:  #define CMD8    (0x40+8)    /* SEND_IF_COND */
+   35:  #define CMD9    (0x40+9)    /* SEND_CSD */
+   36:  #define CMD10   (0x40+10)   /* SEND_CID */
+   37:  #define CMD12   (0x40+12)   /* STOP_TRANSMISSION */
+   38:  #define CMD16   (0x40+16)   /* SET_BLOCKLEN */
+   39:  #define CMD17   (0x40+17)   /* READ_SINGLE_BLOCK */
+   40:  #define CMD18   (0x40+18)   /* READ_MULTIPLE_BLOCK */
+   41:  #define CMD23   (0x40+23)   /* SET_BLOCK_COUNT */
+   42:  #define CMD24   (0x40+24)   /* WRITE_BLOCK */
+   43:  #define CMD25   (0x40+25)   /* WRITE_MULTIPLE_BLOCK */
+   44:  #define CMD41   (0x40+41)   /* SEND_OP_COND (ACMD) */
+   45:  #define CMD55   (0x40+55)   /* APP_CMD */
+   46:  #define CMD58   (0x40+58)   /* READ_OCR */
+   47:  
+   48:  /* Peripheral definitions for MC9S12DP512 board */
+   49:  // SSI port
+   50:  #define SDC_DDR  DDRS
+   51:  #define SDC_PINS 0xE0
+   52:  #define SDC_CR1  SPI0CR1
+   53:  #define SDC_CR2  SPI0CR2
+   54:  #define SDC_BR   SPI0BR
+   55:  #define SDC_SR   SPI0SR
+   56:  #define SDC_DR   SPI0DR
+   57:  // regular output for card chip select
+   58:  #define SDC_CS   PTS_PTS7
+   59:  #define SDC_TX   PTS_PTS5
+   60:  #define SDC_CLK  PTS_PTS6
+   61:  
+   62:  // asserts the CS pin to the card
+   63:  static void SELECT(void){
+*** EVALUATION ***
+
+Function: SELECT
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+   64:    SDC_CS = 0; // CS is low for active
+  0000 1d000080     [4]     BCLR  _PTS,#128
+   65:  }
+  0004 3d           [5]     RTS   
+   66:  
+   67:  // de-asserts the CS pin to the card
+   68:  static void DESELECT(void){
+*** EVALUATION ***
+
+Function: DESELECT
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+   69:    SDC_CS = 1; // CS is high for deactive
+  0000 1c000080     [4]     BSET  _PTS,#128
+   70:  }
+  0004 3d           [5]     RTS   
+   71:  
+   72:  
+   73:  static volatile DSTATUS Stat = STA_NOINIT;    /* Disk status */
+   74:  
+   75:  static volatile BYTE Timer1, Timer2;    /* 100Hz decrement timer */
+   76:  
+   77:  static BYTE CardType;   /* b0:MMC, b1:SDC, b2:Block addressing */
+   78:  
+   79:  static BYTE PowerFlag = 0;     /* indicates if "power" is on */
+   80:  
+   81:  #define TIME_10MS 1875
+   82:  // 24000000/100/128 = 1875
+   83:  //---------------------OC_Init0---------------------
+   84:  // arm output compare 0 for 100Hz periodic interrupt
+   85:  // Input: none
+   86:  // Output: none 
+   87:  void OC_Init0(){
+*** EVALUATION ***
+
+Function: OC_Init0
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+   88:    TIOS |= 0x01;   // activate TC0 as output compare
+  0000 4c0001       [4]     BSET  _TIOS,#1
+   89:    TIE  |= 0x01;   // arm OC0
+  0003 4c0001       [4]     BSET  _TIE,#1
+   90:    TSCR1 = 0x80;   // Enable TCNT, 24MHz boot mode, 8MHz in run mode
+  0006 cc0780       [2]     LDD   #1920
+  0009 5b00         [2]     STAB  _TSCR1
+   91:    TSCR2 = 0x07;   // divide by 128 TCNT prescale, TOI disarm
+  000b 5a00         [2]     STAA  _TSCR2
+   92:    PACTL = 0;      // timer prescale used for TCNT
+  000d 790000       [3]     CLR   _PACTL
+   93:  /* Bottom three bits of TSCR2 (PR2,PR1,PR0) set TCNT period
+   94:      divide  FastMode(24MHz)    Slow Mode (8MHz)
+   95:  000   1     42ns  TOF  2.73ms  125ns TOF  8.192ms
+   96:  001   2     84ns  TOF  5.46ms  250ns TOF 16.384ms 
+   97:  010   4    167ns  TOF  10.9ms  500ns TOF 32.768ms     
+   98:  011   8    333ns  TOF  21.8ms    1us TOF 65.536ms
+   99:  100  16    667ns  TOF  43.7ms    2us TOF 131.072ms
+  100:  101  32   1.33us  TOF  87.4ms    4us TOF 262.144ns
+  101:  110  64   2.67us  TOF 174.8ms    8us TOF 524.288ms
+  102:  111 128   5.33us  TOF 349.5ms   16us TOF 1.048576s */
+  103:    TC0  = TCNT+TIME_10MS; // first interrupt in 10ms
+  0010 dc00         [3]     LDD   _TCNT
+  0012 c30753       [2]     ADDD  #1875
+  0015 5c00         [2]     STD   _TC0
+  104:  }
+  0017 3d           [5]     RTS   
+  105:  
+  106:  //---------- Initialize SPI -----------------
+  107:  // Turn on SDC/SPI Interface, 12 MHz or	83 nsec period
+  108:  // assumes PLL active, so E clock is 24 MHz
+  109:  // Input: none
+  110:  // Output: none
+  111:  void init_spi(void){  
+*** EVALUATION ***
+
+Function: init_spi
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  112:    SDC_CS = 1;    // turn off digital interface 
+  0000 1c000080     [4]     BSET  _PTS,#128
+  113:    SDC_DDR |= SDC_PINS;  
+  0004 1c0000e0     [4]     BSET  _DDRS,#224
+  114:  /* bit SPICR1
+  115:   7 SPIE = 0   no interrupts
+  116:   6 SPE  = 1   enable SPI
+  117:   5 SWOM = 0   regular outputs
+  118:   4 MSTR = 1   master
+  119:   3 CPOL = 0   output changes on fall, 
+  120:   2 CPHA = 0   clock normally low
+  121:   1 SSOE = 0   disable SS
+  122:   0 LSBF = 0   most sign bit first */
+  123:    SDC_CR1 = 0x50;
+  0008 c650         [1]     LDAB  #80
+  000a 5b00         [2]     STAB  _SPI0CR1
+  124:  /* bit SPICR2
+  125:   4 MODFEN = 0  Mode Fault Enable Bit, PM3 normal output  
+  126:   3 BIDIROE= 0  Output enable in the Bidirectional mode of operation
+  127:   1 SPISWAI= 0  SPI Stop in Wait Mode Bit
+  128:   0 SPC0   = 0  normal mode */
+  129:    SDC_CR2 = 0x00;
+  000c 790000       [3]     CLR   _SPI0CR2
+  130:    SDC_BR = 0x00;		// baud rate 
+  000f 790000       [3]     CLR   _SPI0BR
+  131:    // bits 6,5,4 are SPPR, bits 2,1,0 are SPR
+  132:    // divisor is (1+SPPR)*2**(SPR+1) = 1*2**1 = 2
+  133:    // frequency = 24MHz/divisor = 12 MHz or	83 nsec period
+  134:    OC_Init0();
+  0012 060000       [3]     JMP   OC_Init0
+  135:  } 
+  136:  //---------- turn off SPI -----------------
+  137:  // Turn off SDC/SPI Interface
+  138:  // Input: none
+  139:  // Output: none
+  140:  void disable_spi(void){  
+*** EVALUATION ***
+
+Function: disable_spi
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  141:    SDC_CS = 1;    // turn off digital interface 
+  0000 1c000080     [4]     BSET  _PTS,#128
+  142:    SDC_DDR |= SDC_PINS;  
+  0004 1c0000e0     [4]     BSET  _DDRS,#224
+  143:    SDC_CR1 = 0x00;
+  0008 790000       [3]     CLR   _SPI0CR1
+  144:  } 
+  000b 3d           [5]     RTS   
+  145:  /*-----------------------------------------------------------------------*/
+  146:  /* Transmit a byte to MMC via SPI  (Platform dependent)                  */
+  147:  /*-----------------------------------------------------------------------*/
+  148:  static void xmit_spi(BYTE dat){
+*** EVALUATION ***
+
+Function: xmit_spi
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 37           [2]     PSHB  
+  149:    BYTE rcvdat;
+  150:    while(((SDC_SR&0x20)==0)){};// 1) wait for SPTEF=1,
+  0001 4f0020fc     [4]     BRCLR _SPI0SR,#32,*+0 ;abs = 0001
+  151:    SDC_DR = dat;               // 2) output dat frame to SDC
+  0005 e680         [3]     LDAB  0,SP
+  0007 5b00         [2]     STAB  _SPI0DR
+  152:    while(((SDC_SR&0x80)==0)){};// 3) wait for SPIF=1,
+  0009 4f0080fc     [4]     BRCLR _SPI0SR,#128,*+0 ;abs = 0009
+  153:    rcvdat = SDC_DR;            // 4) clear SPIF
+  000d d600         [3]     LDAB  _SPI0DR
+  154:  }
+  000f 32           [3]     PULA  
+  0010 3d           [5]     RTS   
+  155:  
+  156:  
+  157:  /*-----------------------------------------------------------------------*/
+  158:  /* Receive a byte from MMC via SPI  (Platform dependent)                 */
+  159:  /*-----------------------------------------------------------------------*/
+  160:  static BYTE rcvr_spi (void){
+*** EVALUATION ***
+
+Function: rcvr_spi
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  161:    BYTE rcvdat;
+  162:    while(((SDC_SR&0x20)==0)){};// 1) wait for SPTEF=1,
+  0000 4f0020fc     [4]     BRCLR _SPI0SR,#32,*+0 ;abs = 0000
+  163:    SDC_DR = 0xFF;              // 2) output dummy frame to SDC
+  0004 c6ff         [1]     LDAB  #255
+  0006 5b00         [2]     STAB  _SPI0DR
+  164:    while(((SDC_SR&0x80)==0)){};// 3) wait for SPIF=1,
+  0008 4f0080fc     [4]     BRCLR _SPI0SR,#128,*+0 ;abs = 0008
+  165:    rcvdat = SDC_DR;            // 4) read result clear SPIF
+  000c d600         [3]     LDAB  _SPI0DR
+  166:    return rcvdat;
+  167:  }
+  000e 3d           [5]     RTS   
+  168:  
+  169:  
+  170:  static void rcvr_spi_m (BYTE *dst){
+*** EVALUATION ***
+
+Function: rcvr_spi_m
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 3b           [2]     PSHD  
+  171:    *dst = rcvr_spi();
+  0001 0700         [4]     BSR   rcvr_spi
+  0003 ee80         [3]     LDX   0,SP
+  0005 6b00         [2]     STAB  0,X
+  172:  }
+  0007 3a           [3]     PULD  
+  0008 3d           [5]     RTS   
+  173:  
+  174:  /*-----------------------------------------------------------------------*/
+  175:  /* Wait for card ready                                                   */
+  176:  /*-----------------------------------------------------------------------*/
+  177:  static BYTE wait_ready (void){
+*** EVALUATION ***
+
+Function: wait_ready
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 36           [2]     PSHA  
+  178:    BYTE res;
+  179:  
+  180:    Timer2 = 50;    /* Wait for ready in timeout of 500ms */
+  0001 c632         [1]     LDAB  #50
+  0003 7b0000       [3]     STAB  Timer2
+  181:    rcvr_spi();
+  0006 0700         [4]     BSR   rcvr_spi
+  182:    do{
+  183:      res = rcvr_spi();
+  0008 0700         [4]     BSR   rcvr_spi
+  000a 6b80         [2]     STAB  0,SP
+  184:    }
+  185:    while ((res != 0xFF) && Timer2);
+  000c 048105       [3]     IBEQ  B,*+8 ;abs = 0014
+  000f f60000       [3]     LDAB  Timer2
+  0012 26f4         [3/1]   BNE   *-10 ;abs = 0008
+  186:    return res;
+  0014 e680         [3]     LDAB  0,SP
+  187:  }
+  0016 32           [3]     PULA  
+  0017 3d           [5]     RTS   
+  188:  
+  189:  
+  190:  /*-----------------------------------------------------------------------*/
+  191:  /* Send 80 or so clock transitions with CS and DI held high. This is     */
+  192:  /* required after card power up to get it into SPI mode                  */
+  193:  /*-----------------------------------------------------------------------*/
+  194:  static void send_initial_clock_train(void){
+*** EVALUATION ***
+
+Function: send_initial_clock_train
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  195:    unsigned int i;
+  196:    DESELECT();   /* Ensure CS is held high. */
+  0000 160000       [4]     JSR   DESELECT
+  197:    disable_spi();/* Switch the SSI TX line to a GPIO and drive it high too. */
+  0003 0700         [4]     BSR   disable_spi
+  198:    SDC_TX = 1;
+  0005 1c000020     [4]     BSET  _PTS,#32
+  199:    for(i = 0 ; i < 80 ; i++){/* wiggle 80 times. */
+  0009 ce0000       [2]     LDX   #0
+  200:       SDC_CLK = 1;
+  000c 1c000040     [4]     BSET  _PTS,#64
+  201:       SDC_CLK = 0;
+  0010 1d000040     [4]     BCLR  _PTS,#64
+  0014 08           [1]     INX   
+  0015 8e0050       [2]     CPX   #80
+  0018 25f2         [3/1]   BCS   *-12 ;abs = 000c
+  202:    }
+  203:    init_spi(); /* Revert to hardware control of the SSI TX line. */
+  001a 060000       [3]     JMP   init_spi
+  204:  }
+  205:  
+  206:  
+  207:  /*-----------------------------------------------------------------------*/
+  208:  /* Power Control  (Platform dependent)                                   */
+  209:  /*-----------------------------------------------------------------------*/
+  210:  /* When the target system does not support socket power control, there   */
+  211:  /* is nothing to do in these functions and chk_power always returns 1.   */
+  212:  static void power_on (void){
+*** EVALUATION ***
+
+Function: power_on
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  213:   /*
+  214:    * This doesnt really turn the power on, but initializes the
+  215:    * SSI port and pins needed to talk to the card.
+  216:    */
+  217:   /* Set DI and CS high and apply more than 74 pulses to SCLK for the card */
+  218:   /* to be able to accept a native command. */
+  219:   
+  220:    
+  221:    send_initial_clock_train();
+  0000 0700         [4]     BSR   send_initial_clock_train
+  222:  
+  223:    PowerFlag = 1;
+  0002 c601         [1]     LDAB  #1
+  0004 7b0000       [3]     STAB  PowerFlag
+  224:  }
+  0007 3d           [5]     RTS   
+  225:  
+  226:  // set the SSI speed to the max setting
+  227:  static void set_max_speed(void){
+*** EVALUATION ***
+
+Function: set_max_speed
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  228:    init_spi();   // may be able to skip this becasue already at 12 MHz
+  0000 060000       [3]     JMP   init_spi
+  229:  }
+  230:  
+  231:  static void power_off (void){
+*** EVALUATION ***
+
+Function: power_off
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  232:    PowerFlag = 0;
+  0000 790000       [3]     CLR   PowerFlag
+  233:  }
+  0003 3d           [5]     RTS   
+  234:  
+  235:  static int chk_power(void){ /* Socket power state: 0=off, 1=on */
+*** EVALUATION ***
+
+Function: chk_power
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  236:    return PowerFlag;
+  0000 f60000       [3]     LDAB  PowerFlag
+  0003 87           [1]     CLRA  
+  237:  }
+  0004 3d           [5]     RTS   
+  238:  
+  239:  
+  240:  
+  241:  /*-----------------------------------------------------------------------*/
+  242:  /* Receive a data packet from MMC                                        */
+  243:  /*-----------------------------------------------------------------------*/
+  244:  
+  245:  static BOOL rcvr_datablock (
+  246:    BYTE *buff,         /* Data buffer to store received data */
+  247:    UINT btr            /* Byte count (must be even number) */
+  248:  ){
+*** EVALUATION ***
+
+Function: rcvr_datablock
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 6cad         [2]     STD   3,-SP
+  249:    BYTE token;
+  250:  
+  251:  
+  252:    Timer1 = 10;
+  0002 c60a         [1]     LDAB  #10
+  0004 7b0000       [3]     STAB  Timer1
+  253:    do {                            /* Wait for data packet in timeout of 100ms */
+  254:       token = rcvr_spi();
+  0007 0700         [4]     BSR   rcvr_spi
+  0009 6b82         [2]     STAB  2,SP
+  255:    } while ((token == 0xFF) && Timer1);
+  000b 04a105       [3]     IBNE  B,*+8 ;abs = 0013
+  000e f60000       [3]     LDAB  Timer1
+  0011 26f4         [3/1]   BNE   *-10 ;abs = 0007
+  256:    if(token != 0xFE) return FALSE;    /* If not valid data token, retutn with error */
+  0013 e682         [3]     LDAB  2,SP
+  0015 c1fe         [1]     CMPB  #254
+  0017 2703         [3/1]   BEQ   *+5 ;abs = 001c
+  0019 c7           [1]     CLRB  
+  001a 2021         [3]     BRA   *+35 ;abs = 003d
+  257:  
+  258:    do {                            /* Receive the data block into buffer */
+  259:       rcvr_spi_m(buff++);
+  001c ee85         [3]     LDX   5,SP
+  001e 08           [1]     INX   
+  001f ec85         [3]     LDD   5,SP
+  0021 34           [2]     PSHX  
+  0022 0700         [4]     BSR   rcvr_spi_m
+  260:       rcvr_spi_m(buff++);
+  0024 30           [3]     PULX  
+  0025 1901         [2]     LEAY  1,X
+  0027 6d85         [2]     STY   5,SP
+  0029 b754         [1]     TFR   X,D
+  002b 0700         [4]     BSR   rcvr_spi_m
+  261:    } while (btr -= 2);
+  002d ee80         [3]     LDX   0,SP
+  002f 1a1e         [2]     LEAX  -2,X
+  0031 6e80         [2]     STX   0,SP
+  0033 26e7         [3/1]   BNE   *-23 ;abs = 001c
+  262:    rcvr_spi();                        /* Discard CRC */
+  0035 160000       [4]     JSR   rcvr_spi
+  263:    rcvr_spi();
+  0038 160000       [4]     JSR   rcvr_spi
+  264:  
+  265:    return TRUE;                    /* Return with success */
+  003b c601         [1]     LDAB  #1
+  266:  }
+  003d 1b83         [2]     LEAS  3,SP
+  003f 3d           [5]     RTS   
+  267:  
+  268:  
+  269:  /*-----------------------------------------------------------------------*/
+  270:  /* Send a data packet to MMC                                             */
+  271:  /*-----------------------------------------------------------------------*/
+  272:  #if _READONLY == 0
+  273:  static BOOL xmit_datablock (
+  274:    const BYTE *buff,    /* 512 byte data block to be transmitted */
+  275:    BYTE token            /* Data/Stop token */
+  276:  ) {
+*** EVALUATION ***
+
+Function: xmit_datablock
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 37           [2]     PSHB  
+  277:    BYTE resp, wc;
+  278:  
+  279:  
+  280:    if (wait_ready() != 0xFF) return FALSE;
+  0001 160000       [4]     JSR   wait_ready
+  0004 04a136       [3]     IBNE  B,*+57 ;abs = 003d
+  281:  
+  282:    xmit_spi(token);                    /* Xmit data token */
+  0007 e680         [3]     LDAB  0,SP
+  0009 160000       [4]     JSR   xmit_spi
+  283:    if (token != 0xFD) {    /* Is data token */
+  000c e680         [3]     LDAB  0,SP
+  000e c1fd         [1]     CMPB  #253
+  0010 272d         [3/1]   BEQ   *+47 ;abs = 003f
+  284:      wc = 0;
+  0012 87           [1]     CLRA  
+  285:      do {                            /* Xmit the 512 byte data block to MMC */
+  286:        xmit_spi(*buff++);
+  0013 ee83         [3]     LDX   3,SP
+  0015 e630         [3]     LDAB  1,X+
+  0017 36           [2]     PSHA  
+  0018 34           [2]     PSHX  
+  0019 160000       [4]     JSR   xmit_spi
+  287:        xmit_spi(*buff++);
+  001c 30           [3]     PULX  
+  001d e630         [3]     LDAB  1,X+
+  001f 6e84         [2]     STX   4,SP
+  0021 160000       [4]     JSR   xmit_spi
+  288:      } while (--wc);
+  0024 33           [3]     PULB  
+  0025 53           [1]     DECB  
+  0026 b710         [1]     TFR   B,A
+  0028 26e9         [3/1]   BNE   *-21 ;abs = 0013
+  289:      xmit_spi(0xFF);                    /* CRC (Dummy) */
+  002a c6ff         [1]     LDAB  #255
+  002c 160000       [4]     JSR   xmit_spi
+  290:      xmit_spi(0xFF);
+  002f c6ff         [1]     LDAB  #255
+  0031 160000       [4]     JSR   xmit_spi
+  291:      resp = rcvr_spi();                /* Reveive data response */
+  0034 160000       [4]     JSR   rcvr_spi
+  292:      if ((resp & 0x1F) != 0x05)        /* If not accepted, return with error */
+  0037 c41f         [1]     ANDB  #31
+  0039 c105         [1]     CMPB  #5
+  003b 2702         [3/1]   BEQ   *+4 ;abs = 003f
+  293:        return FALSE;
+  003d c7           [1]     CLRB  
+  003e 8f           [2]     SKIP2 
+  294:    }
+  295:  
+  296:    return TRUE;
+  003f c601         [1]     LDAB  #1
+  297:  }
+  0041 32           [3]     PULA  
+  0042 3d           [5]     RTS   
+  298:  #endif /* _READONLY */
+  299:  
+  300:  
+  301:  
+  302:  /*-----------------------------------------------------------------------*/
+  303:  /* Send a command packet to MMC                                          */
+  304:  /*-----------------------------------------------------------------------*/
+  305:  static BYTE send_cmd (
+  306:    BYTE cmd,        /* Command byte */
+  307:    DWORD arg        /* Argument */
+  308:  ) {
+*** EVALUATION ***
+
+Function: send_cmd
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 6cac         [2]     STD   4,-SP
+  0002 34           [2]     PSHX  
+  309:    BYTE n, res;
+  310:  
+  311:  
+  312:    if (wait_ready() != 0xFF) return 0xFF;
+  0003 160000       [4]     JSR   wait_ready
+  0006 048104       [3]     IBEQ  B,*+7 ;abs = 000d
+  0009 c6ff         [1]     LDAB  #255
+  000b 2052         [3]     BRA   *+84 ;abs = 005f
+  313:  
+  314:      /* Send command packet */
+  315:    xmit_spi(cmd);                        /* Command */
+  000d e688         [3]     LDAB  8,SP
+  000f 160000       [4]     JSR   xmit_spi
+  316:    xmit_spi((BYTE)(arg >> 24));        /* Argument[31..24] */
+  0012 e680         [3]     LDAB  0,SP
+  0014 160000       [4]     JSR   xmit_spi
+  317:    xmit_spi((BYTE)(arg >> 16));        /* Argument[23..16] */
+  0017 e681         [3]     LDAB  1,SP
+  0019 160000       [4]     JSR   xmit_spi
+  318:    xmit_spi((BYTE)(arg >> 8));            /* Argument[15..8] */
+  001c e682         [3]     LDAB  2,SP
+  001e 160000       [4]     JSR   xmit_spi
+  319:    xmit_spi((BYTE)arg);                /* Argument[7..0] */
+  0021 e683         [3]     LDAB  3,SP
+  0023 160000       [4]     JSR   xmit_spi
+  320:    n = 0;
+  0026 6984         [2]     CLR   4,SP
+  321:    if (cmd == CMD0) n = 0x95;            /* CRC for CMD0(0) */
+  0028 e688         [3]     LDAB  8,SP
+  002a c140         [1]     CMPB  #64
+  002c 2604         [3/1]   BNE   *+6 ;abs = 0032
+  002e c695         [1]     LDAB  #149
+  0030 6b84         [2]     STAB  4,SP
+  322:    if (cmd == CMD8) n = 0x87;            /* CRC for CMD8(0x1AA) */
+  0032 e688         [3]     LDAB  8,SP
+  0034 c148         [1]     CMPB  #72
+  0036 2604         [3/1]   BNE   *+6 ;abs = 003c
+  0038 c687         [1]     LDAB  #135
+  003a 6b84         [2]     STAB  4,SP
+  323:    xmit_spi(n);
+  003c e684         [3]     LDAB  4,SP
+  003e 160000       [4]     JSR   xmit_spi
+  324:  
+  325:      /* Receive command response */
+  326:    if (cmd == CMD12) rcvr_spi();        /* Skip a stuff byte when stop reading */
+  0041 e688         [3]     LDAB  8,SP
+  0043 c14c         [1]     CMPB  #76
+  0045 2603         [3/1]   BNE   *+5 ;abs = 004a
+  0047 160000       [4]     JSR   rcvr_spi
+  327:    n = 10;                                /* Wait for a valid response in timeout of 10 attempts */
+  004a c60a         [1]     LDAB  #10
+  004c 6b84         [2]     STAB  4,SP
+  328:    do
+  329:      res = rcvr_spi();
+  004e 160000       [4]     JSR   rcvr_spi
+  0051 6b85         [2]     STAB  5,SP
+  330:    while ((res & 0x80) && --n);
+  0053 c480         [1]     ANDB  #128
+  0055 2706         [3/1]   BEQ   *+8 ;abs = 005d
+  0057 6384         [3]     DEC   4,SP
+  0059 e684         [3]     LDAB  4,SP
+  005b 26f1         [3/1]   BNE   *-13 ;abs = 004e
+  331:  
+  332:    return res;            /* Return with the response value */
+  005d e685         [3]     LDAB  5,SP
+  333:  }
+  005f 1b86         [2]     LEAS  6,SP
+  0061 3d           [5]     RTS   
+  334:  
+  335:  
+  336:  
+  337:  /*--------------------------------------------------------------------------
+  338:  
+  339:     Public Functions
+  340:  
+  341:  ---------------------------------------------------------------------------*/
+  342:  
+  343:  
+  344:  /*-----------------------------------------------------------------------*/
+  345:  /* Initialize Disk Drive                                                 */
+  346:  /*-----------------------------------------------------------------------*/
+  347:  // since this program initializes the disk, it must run with 
+  348:  //    the disk periodic task operating
+  349:  DSTATUS eDisk_Init(
+  350:    BYTE drv        /* Physical drive nmuber (0) */
+  351:  ) {
+*** EVALUATION ***
+
+Function: eDisk_Init
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 1b9a         [2]     LEAS  -6,SP
+  352:    BYTE n, ty, ocr[4];
+  353:  
+  354:  
+  355:    if (drv) return STA_NOINIT;            /* Supports only single drive */
+  0002 044105       [3]     TBEQ  B,*+8 ;abs = 000a
+  0005 c601         [1]     LDAB  #1
+  0007 060000       [3]     JMP   eDisk_Init:0x00fb
+  356:    if (Stat & STA_NODISK) return Stat;    /* No card in the socket */
+  000a 1f00000203   [5]     BRCLR Stat,#2,*+8 ;abs = 0012
+  000f 060000       [3]     JMP   eDisk_Init:0x00f8
+  357:  
+  358:    power_on();                            /* Force socket power on */
+  0012 160000       [4]     JSR   power_on
+  359:    send_initial_clock_train();
+  0015 160000       [4]     JSR   send_initial_clock_train
+  360:  
+  361:    SELECT();                /* CS = L */
+  0018 160000       [4]     JSR   SELECT
+  362:    ty = 0;
+  001b 6981         [2]     CLR   1,SP
+  363:    if (send_cmd(CMD0, 0) == 1) {            /* Enter Idle state */
+  001d c640         [1]     LDAB  #64
+  001f 160000       [4]     JSR   eDisk_Init:0x00fe
+  0022 0421b8       [3]     DBNE  B,*+187 ;abs = 00dd
+  364:      Timer1 = 100;                        /* Initialization timeout of 1000 msec */
+  0025 cc4864       [2]     LDD   #18532
+  0028 7b0000       [3]     STAB  Timer1
+  365:      if (send_cmd(CMD8, 0x1AA) == 1) {    /* SDC Ver2+ */
+  002b 36           [2]     PSHA  
+  002c cc01aa       [2]     LDD   #426
+  002f ce0000       [2]     LDX   #0
+  0032 160000       [4]     JSR   send_cmd
+  0035 1b81         [2]     LEAS  1,SP
+  0037 042151       [3]     DBNE  B,*+84 ;abs = 008b
+  366:        for (n = 0; n < 4; n++) ocr[n] = rcvr_spi();
+  003a 6980         [2]     CLR   0,SP
+  003c 160000       [4]     JSR   eDisk_Init:0x0109
+  003f 25fb         [3/1]   BCS   *-3 ;abs = 003c
+  367:        if (ocr[2] == 0x01 && ocr[3] == 0xAA) {    /* The card can work at vdd range of 2.7-3.6V */
+  0041 e684         [3]     LDAB  4,SP
+  0043 042197       [3]     DBNE  B,*+154 ;abs = 00dd
+  0046 e685         [3]     LDAB  5,SP
+  0048 c1aa         [1]     CMPB  #170
+  004a 263d         [3/1]   BNE   *+63 ;abs = 0089
+  368:          do {
+  369:            if (send_cmd(CMD55, 0) <= 1 && send_cmd(CMD41, 1UL << 30) == 0)    break;    /* ACMD41 with HCS bit */
+  004c c677         [1]     LDAB  #119
+  004e 160000       [4]     JSR   eDisk_Init:0x00fe
+  0051 c101         [1]     CMPB  #1
+  0053 2210         [3/1]   BHI   *+18 ;abs = 0065
+  0055 c669         [1]     LDAB  #105
+  0057 37           [2]     PSHB  
+  0058 c7           [1]     CLRB  
+  0059 87           [1]     CLRA  
+  005a ce4000       [2]     LDX   #16384
+  005d 160000       [4]     JSR   send_cmd
+  0060 1b81         [2]     LEAS  1,SP
+  0062 044105       [3]     TBEQ  B,*+8 ;abs = 006a
+  370:          } while (Timer1);
+  0065 f60000       [3]     LDAB  Timer1
+  0068 26e2         [3/1]   BNE   *-28 ;abs = 004c
+  371:          if (Timer1 && send_cmd(CMD58, 0) == 0) {    /* Check CCS bit */
+  006a f60000       [3]     LDAB  Timer1
+  006d 276e         [3/1]   BEQ   *+112 ;abs = 00dd
+  006f c67a         [1]     LDAB  #122
+  0071 160000       [4]     JSR   eDisk_Init:0x00fe
+  0074 046166       [3]     TBNE  B,*+105 ;abs = 00dd
+  372:            for (n = 0; n < 4; n++) ocr[n] = rcvr_spi();
+  0077 6980         [2]     CLR   0,SP
+  0079 160000       [4]     JSR   eDisk_Init:0x0109
+  007c 25fb         [3/1]   BCS   *-3 ;abs = 0079
+  373:            ty = (ocr[0] & 0x40) ? 6 : 2;
+  007e 0e824003     [4]     BRSET 2,SP,#64,*+7 ;abs = 0085
+  0082 c602         [1]     LDAB  #2
+  0084 8f           [2]     SKIP2 
+  0085 c606         [1]     LDAB  #6
+  0087 6b81         [2]     STAB  1,SP
+  0089 2052         [3]     BRA   *+84 ;abs = 00dd
+  374:          }
+  375:        }
+  376:      } else {                            /* SDC Ver1 or MMC */
+  377:        ty = (send_cmd(CMD55, 0) <= 1 && send_cmd(CMD41, 0) <= 1) ? 2 : 1;    /* SDC : MMC */
+  008b c677         [1]     LDAB  #119
+  008d 160000       [4]     JSR   eDisk_Init:0x011e
+  0090 c101         [1]     CMPB  #1
+  0092 2209         [3/1]   BHI   *+11 ;abs = 009d
+  0094 c669         [1]     LDAB  #105
+  0096 160000       [4]     JSR   eDisk_Init:0x011e
+  0099 c101         [1]     CMPB  #1
+  009b 2303         [3/1]   BLS   *+5 ;abs = 00a0
+  009d c601         [1]     LDAB  #1
+  009f 8f           [2]     SKIP2 
+  00a0 c602         [1]     LDAB  #2
+  00a2 6b81         [2]     STAB  1,SP
+  378:        do {
+  379:          if (ty == 2) {
+  00a4 e681         [3]     LDAB  1,SP
+  00a6 c102         [1]     CMPB  #2
+  00a8 2611         [3/1]   BNE   *+19 ;abs = 00bb
+  380:            if (send_cmd(CMD55, 0) <= 1 && send_cmd(CMD41, 0) == 0) break;    /* ACMD41 */
+  00aa c677         [1]     LDAB  #119
+  00ac 0750         [4]     BSR   *+82 ;abs = 00fe
+  00ae c101         [1]     CMPB  #1
+  00b0 2210         [3/1]   BHI   *+18 ;abs = 00c2
+  00b2 c669         [1]     LDAB  #105
+  00b4 0768         [4]     BSR   *+106 ;abs = 011e
+  00b6 046109       [3]     TBNE  B,*+12 ;abs = 00c2
+  00b9 200c         [3]     BRA   *+14 ;abs = 00c7
+  381:          } else {
+  382:            if (send_cmd(CMD1, 0) == 0) break;                                /* CMD1 */
+  00bb c641         [1]     LDAB  #65
+  00bd 073f         [4]     BSR   *+65 ;abs = 00fe
+  00bf 044105       [3]     TBEQ  B,*+8 ;abs = 00c7
+  383:          }
+  384:        } while (Timer1);
+  00c2 f60000       [3]     LDAB  Timer1
+  00c5 26dd         [3/1]   BNE   *-33 ;abs = 00a4
+  385:        if (!Timer1 || send_cmd(CMD16, 512) != 0)    /* Select R/W block length */
+  00c7 f60000       [3]     LDAB  Timer1
+  00ca 270f         [3/1]   BEQ   *+17 ;abs = 00db
+  00cc cc0250       [2]     LDD   #592
+  00cf 37           [2]     PSHB  
+  00d0 c7           [1]     CLRB  
+  00d1 b715         [1]     SEX   B,X
+  00d3 160000       [4]     JSR   send_cmd
+  00d6 1b81         [2]     LEAS  1,SP
+  00d8 044102       [3]     TBEQ  B,*+5 ;abs = 00dd
+  386:          ty = 0;
+  00db 6981         [2]     CLR   1,SP
+  387:      }
+  388:    }
+  389:    CardType = ty;
+  00dd e681         [3]     LDAB  1,SP
+  00df 7b0000       [3]     STAB  CardType
+  390:    DESELECT();            /* CS = H */
+  00e2 160000       [4]     JSR   DESELECT
+  391:    rcvr_spi();            /* Idle (Release DO) */
+  00e5 160000       [4]     JSR   rcvr_spi
+  392:  
+  393:    if (ty) {            /* Initialization succeded */
+  00e8 e681         [3]     LDAB  1,SP
+  00ea 2709         [3/1]   BEQ   *+11 ;abs = 00f5
+  394:      Stat &= ~STA_NOINIT;        /* Clear STA_NOINIT */
+  00ec 1d000001     [4]     BCLR  Stat,#1
+  395:      set_max_speed();
+  00f0 160000       [4]     JSR   set_max_speed
+  396:    } else {            /* Initialization failed */
+  00f3 2003         [3]     BRA   *+5 ;abs = 00f8
+  397:      power_off();
+  00f5 160000       [4]     JSR   power_off
+  398:    }
+  399:    return Stat;
+  00f8 f60000       [3]     LDAB  Stat
+  400:  }
+  00fb 1b86         [2]     LEAS  6,SP
+  00fd 3d           [5]     RTS   
+  00fe 37           [2]     PSHB  
+  00ff c7           [1]     CLRB  
+  0100 87           [1]     CLRA  
+  0101 b745         [1]     TFR   D,X
+  0103 160000       [4]     JSR   send_cmd
+  0106 1b81         [2]     LEAS  1,SP
+  0108 3d           [5]     RTS   
+  0109 e682         [3]     LDAB  2,SP
+  010b 87           [1]     CLRA  
+  010c 1a84         [2]     LEAX  4,SP
+  010e 1ae6         [2]     LEAX  D,X
+  0110 34           [2]     PSHX  
+  0111 160000       [4]     JSR   rcvr_spi
+  0114 30           [3]     PULX  
+  0115 6b00         [2]     STAB  0,X
+  0117 6282         [3]     INC   2,SP
+  0119 e682         [3]     LDAB  2,SP
+  011b c104         [1]     CMPB  #4
+  011d 3d           [5]     RTS   
+  011e 37           [2]     PSHB  
+  011f c7           [1]     CLRB  
+  0120 87           [1]     CLRA  
+  0121 b745         [1]     TFR   D,X
+  0123 160000       [4]     JSR   send_cmd
+  0126 1b81         [2]     LEAS  1,SP
+  0128 3d           [5]     RTS   
+  401:  
+  402:  
+  403:  
+  404:  /*-----------------------------------------------------------------------*/
+  405:  /* Get Disk Status                                                       */
+  406:  /*-----------------------------------------------------------------------*/
+  407:  
+  408:  DSTATUS eDisk_Status (
+  409:    BYTE drv        /* Physical drive nmuber (0) */
+  410:  ) {
+*** EVALUATION ***
+
+Function: eDisk_Status
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  411:    if (drv) return STA_NOINIT;        /* Supports only single drive */
+  0000 044103       [3]     TBEQ  B,*+6 ;abs = 0006
+  0003 c601         [1]     LDAB  #1
+  0005 3d           [5]     RTS   
+  412:    return Stat;
+  0006 f60000       [3]     LDAB  Stat
+  413:  }
+  0009 3d           [5]     RTS   
+  414:  
+  415:  
+  416:  
+  417:  /*-----------------------------------------------------------------------*/
+  418:  /* Read Sector(s)                                                        */
+  419:  /*-----------------------------------------------------------------------*/
+  420:  
+  421:  DRESULT eDisk_Read (
+  422:    BYTE drv,            /* Physical drive nmuber (0) */
+  423:    BYTE *buff,            /* Pointer to the data buffer to store read data */
+  424:    DWORD sector,        /* Start sector number (LBA) */
+  425:    BYTE count            /* Sector count (1..255) */
+  426:  ){
+*** EVALUATION ***
+
+Function: eDisk_Read
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 37           [2]     PSHB  
+  427:    if (drv || !count) return RES_PARERR;
+  0001 e689         [3]     LDAB  9,SP
+  0003 2604         [3/1]   BNE   *+6 ;abs = 0009
+  0005 e680         [3]     LDAB  0,SP
+  0007 2604         [3/1]   BNE   *+6 ;abs = 000d
+  0009 c604         [1]     LDAB  #4
+  000b 2064         [3]     BRA   *+102 ;abs = 0071
+  428:    if (Stat & STA_NOINIT) return RES_NOTRDY;
+  000d 1f00000104   [5]     BRCLR Stat,#1,*+9 ;abs = 0016
+  0012 c603         [1]     LDAB  #3
+  0014 205b         [3]     BRA   *+93 ;abs = 0071
+  429:  
+  430:    if (!(CardType & 4)) sector *= 512;    /* Convert to byte address if needed */
+  0016 1e0000040d   [5]     BRSET CardType,#4,*+18 ;abs = 0028
+  001b ed85         [3]     LDY   5,SP
+  001d ee83         [3]     LDX   3,SP
+  001f c609         [1]     LDAB  #9
+  0021 160000       [4]     JSR   _LSHL
+  0024 6c85         [2]     STD   5,SP
+  0026 6e83         [2]     STX   3,SP
+  431:  
+  432:    SELECT();            /* CS = L */
+  0028 160000       [4]     JSR   SELECT
+  433:  
+  434:    if (count == 1) {    /* Single block read */
+  002b e680         [3]     LDAB  0,SP
+  002d 042110       [3]     DBNE  B,*+19 ;abs = 0040
+  435:      if ((send_cmd(CMD17, sector) == 0)    /* READ_SINGLE_BLOCK */
+  0030 c651         [1]     LDAB  #81
+  0032 074d         [4]     BSR   *+79 ;abs = 0081
+  0034 04612e       [3]     TBNE  B,*+49 ;abs = 0065
+  436:           && rcvr_datablock(buff, 512))
+  0037 073c         [4]     BSR   *+62 ;abs = 0075
+  0039 044129       [3]     TBEQ  B,*+44 ;abs = 0065
+  437:        count = 0;
+  003c 6980         [2]     CLR   0,SP
+  003e 2025         [3]     BRA   *+39 ;abs = 0065
+  438:    }
+  439:    else {                /* Multiple block read */
+  440:      if (send_cmd(CMD18, sector) == 0) {    /* READ_MULTIPLE_BLOCK */
+  0040 c652         [1]     LDAB  #82
+  0042 073d         [4]     BSR   *+63 ;abs = 0081
+  0044 04611e       [3]     TBNE  B,*+33 ;abs = 0065
+  441:        do {
+  442:          if (!rcvr_datablock(buff, 512)) break;
+  0047 072c         [4]     BSR   *+46 ;abs = 0075
+  0049 04410d       [3]     TBEQ  B,*+16 ;abs = 0059
+  443:          buff += 512;
+  004c ec87         [3]     LDD   7,SP
+  004e c30200       [2]     ADDD  #512
+  0051 6c87         [2]     STD   7,SP
+  444:        } while (--count);
+  0053 6380         [3]     DEC   0,SP
+  0055 e680         [3]     LDAB  0,SP
+  0057 26ee         [3/1]   BNE   *-16 ;abs = 0047
+  445:        send_cmd(CMD12, 0);                /* STOP_TRANSMISSION */
+  0059 c64c         [1]     LDAB  #76
+  005b 37           [2]     PSHB  
+  005c c7           [1]     CLRB  
+  005d 87           [1]     CLRA  
+  005e b745         [1]     TFR   D,X
+  0060 160000       [4]     JSR   send_cmd
+  0063 1b81         [2]     LEAS  1,SP
+  446:      }
+  447:    }
+  448:  
+  449:    DESELECT();            /* CS = H */
+  0065 160000       [4]     JSR   DESELECT
+  450:    rcvr_spi();            /* Idle (Release DO) */
+  0068 160000       [4]     JSR   rcvr_spi
+  451:  
+  452:    return count ? RES_ERROR : RES_OK;
+  006b e680         [3]     LDAB  0,SP
+  006d 2702         [3/1]   BEQ   *+4 ;abs = 0071
+  006f c601         [1]     LDAB  #1
+  0071 87           [1]     CLRA  
+  453:  }
+  0072 1b81         [2]     LEAS  1,SP
+  0074 3d           [5]     RTS   
+  0075 ec89         [3]     LDD   9,SP
+  0077 3b           [2]     PSHD  
+  0078 8602         [1]     LDAA  #2
+  007a c7           [1]     CLRB  
+  007b 160000       [4]     JSR   rcvr_datablock
+  007e 1b82         [2]     LEAS  2,SP
+  0080 3d           [5]     RTS   
+  0081 37           [2]     PSHB  
+  0082 ec88         [3]     LDD   8,SP
+  0084 ee86         [3]     LDX   6,SP
+  0086 160000       [4]     JSR   send_cmd
+  0089 1b81         [2]     LEAS  1,SP
+  008b 3d           [5]     RTS   
+  454:  
+  455:  //*************** eDisk_ReadBlock ***********
+  456:  // Read 1 block of 512 bytes from the SD card  (write to RAM)
+  457:  // Inputs: pointer to an empty RAM buffer
+  458:  //         sector number of SD card to read: 0,1,2,...
+  459:  // Outputs: result
+  460:  //  RES_OK        0: Successful 
+  461:  //  RES_ERROR     1: R/W Error 
+  462:  //  RES_WRPRT     2: Write Protected 
+  463:  //  RES_NOTRDY    3: Not Ready 
+  464:  //  RES_PARERR    4: Invalid Parameter 
+  465:  DRESULT eDisk_ReadBlock (
+  466:    BYTE *buff,         /* Pointer to the data buffer to store read data */
+  467:    DWORD sector        /* Start sector number (LBA) */
+  468:  ) {
+*** EVALUATION ***
+
+Function: eDisk_ReadBlock
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 3b           [2]     PSHD  
+  0001 34           [2]     PSHX  
+  469:    return eDisk_Read(0,buff,sector,1);
+  0002 c7           [1]     CLRB  
+  0003 37           [2]     PSHB  
+  0004 ec87         [3]     LDD   7,SP
+  0006 3b           [2]     PSHD  
+  0007 ec85         [3]     LDD   5,SP
+  0009 3b           [2]     PSHD  
+  000a 34           [2]     PSHX  
+  000b c601         [1]     LDAB  #1
+  000d 160000       [4]     JSR   eDisk_Read
+  0010 1b87         [2]     LEAS  7,SP
+  470:  }
+  0012 1b84         [2]     LEAS  4,SP
+  0014 3d           [5]     RTS   
+  471:  
+  472:  /*-----------------------------------------------------------------------*/
+  473:  /* Write Sector(s)                                                       */
+  474:  /*-----------------------------------------------------------------------*/
+  475:  
+  476:  #if _READONLY == 0
+  477:  DRESULT eDisk_Write (
+  478:    BYTE drv,            /* Physical drive nmuber (0) */
+  479:    const BYTE *buff,    /* Pointer to the data to be written */
+  480:    DWORD sector,        /* Start sector number (LBA) */
+  481:    BYTE count            /* Sector count (1..255) */
+  482:  ){
+*** EVALUATION ***
+
+Function: eDisk_Write
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 37           [2]     PSHB  
+  483:    if (drv || !count) return RES_PARERR;
+  0001 e689         [3]     LDAB  9,SP
+  0003 2604         [3/1]   BNE   *+6 ;abs = 0009
+  0005 e680         [3]     LDAB  0,SP
+  0007 2604         [3/1]   BNE   *+6 ;abs = 000d
+  0009 c604         [1]     LDAB  #4
+  000b 2010         [3]     BRA   *+18 ;abs = 001d
+  484:    if (Stat & STA_NOINIT) return RES_NOTRDY;
+  000d 1f00000104   [5]     BRCLR Stat,#1,*+9 ;abs = 0016
+  0012 c603         [1]     LDAB  #3
+  0014 2007         [3]     BRA   *+9 ;abs = 001d
+  485:    if (Stat & STA_PROTECT) return RES_WRPRT;
+  0016 1f00000405   [5]     BRCLR Stat,#4,*+10 ;abs = 0020
+  001b c602         [1]     LDAB  #2
+  001d 060000       [3]     JMP   eDisk_Write:0x00af
+  486:  
+  487:    if (!(CardType & 4)) sector *= 512;    /* Convert to byte address if needed */
+  0020 1e0000040d   [5]     BRSET CardType,#4,*+18 ;abs = 0032
+  0025 ed85         [3]     LDY   5,SP
+  0027 ee83         [3]     LDX   3,SP
+  0029 c609         [1]     LDAB  #9
+  002b 160000       [4]     JSR   _LSHL
+  002e 6c85         [2]     STD   5,SP
+  0030 6e83         [2]     STX   3,SP
+  488:  
+  489:    SELECT();            /* CS = L */
+  0032 160000       [4]     JSR   SELECT
+  490:  
+  491:    if (count == 1) {    /* Single block write */
+  0035 e680         [3]     LDAB  0,SP
+  0037 c101         [1]     CMPB  #1
+  0039 2618         [3/1]   BNE   *+26 ;abs = 0053
+  492:      if ((send_cmd(CMD24, sector) == 0)    /* WRITE_BLOCK */
+  003b c658         [1]     LDAB  #88
+  003d 0774         [4]     BSR   *+118 ;abs = 00b3
+  003f 046161       [3]     TBNE  B,*+100 ;abs = 00a3
+  493:            && xmit_datablock(buff, 0xFE))
+  0042 ec87         [3]     LDD   7,SP
+  0044 3b           [2]     PSHD  
+  0045 c6fe         [1]     LDAB  #254
+  0047 160000       [4]     JSR   xmit_datablock
+  004a 1b82         [2]     LEAS  2,SP
+  004c 044154       [3]     TBEQ  B,*+87 ;abs = 00a3
+  494:        count = 0;
+  004f 6980         [2]     CLR   0,SP
+  495:    }
+  0051 2050         [3]     BRA   *+82 ;abs = 00a3
+  496:    else {                /* Multiple block write */
+  497:      if (CardType & 2) {
+  0053 1f00000219   [5]     BRCLR CardType,#2,*+30 ;abs = 0071
+  498:        send_cmd(CMD55, 0); send_cmd(CMD23, count);    /* ACMD23 */
+  0058 8677         [1]     LDAA  #119
+  005a 36           [2]     PSHA  
+  005b c7           [1]     CLRB  
+  005c 87           [1]     CLRA  
+  005d b745         [1]     TFR   D,X
+  005f 160000       [4]     JSR   send_cmd
+  0062 c657         [1]     LDAB  #87
+  0064 6b80         [2]     STAB  0,SP
+  0066 e681         [3]     LDAB  1,SP
+  0068 87           [1]     CLRA  
+  0069 ce0000       [2]     LDX   #0
+  006c 160000       [4]     JSR   send_cmd
+  006f 1b81         [2]     LEAS  1,SP
+  499:      }
+  500:      if (send_cmd(CMD25, sector) == 0) {    /* WRITE_MULTIPLE_BLOCK */
+  0071 c659         [1]     LDAB  #89
+  0073 073e         [4]     BSR   *+64 ;abs = 00b3
+  0075 04612b       [3]     TBNE  B,*+46 ;abs = 00a3
+  501:        do {
+  502:          if (!xmit_datablock(buff, 0xFC)) break;
+  0078 ec87         [3]     LDD   7,SP
+  007a 3b           [2]     PSHD  
+  007b c6fc         [1]     LDAB  #252
+  007d 160000       [4]     JSR   xmit_datablock
+  0080 1b82         [2]     LEAS  2,SP
+  0082 04410d       [3]     TBEQ  B,*+16 ;abs = 0092
+  503:          buff += 512;
+  0085 ec87         [3]     LDD   7,SP
+  0087 c30200       [2]     ADDD  #512
+  008a 6c87         [2]     STD   7,SP
+  504:        } while (--count);
+  008c 6380         [3]     DEC   0,SP
+  008e e680         [3]     LDAB  0,SP
+  0090 26e6         [3/1]   BNE   *-24 ;abs = 0078
+  505:        if (!xmit_datablock(0, 0xFD))    /* STOP_TRAN token */
+  0092 c7           [1]     CLRB  
+  0093 87           [1]     CLRA  
+  0094 3b           [2]     PSHD  
+  0095 c6fd         [1]     LDAB  #253
+  0097 160000       [4]     JSR   xmit_datablock
+  009a 1b82         [2]     LEAS  2,SP
+  009c 046104       [3]     TBNE  B,*+7 ;abs = 00a3
+  506:          count = 1;
+  009f c601         [1]     LDAB  #1
+  00a1 6b80         [2]     STAB  0,SP
+  507:      }
+  508:    }
+  509:  
+  510:    DESELECT();            /* CS = H */
+  00a3 160000       [4]     JSR   DESELECT
+  511:    rcvr_spi();            /* Idle (Release DO) */
+  00a6 160000       [4]     JSR   rcvr_spi
+  512:    return count ? RES_ERROR : RES_OK;
+  00a9 e680         [3]     LDAB  0,SP
+  00ab 2702         [3/1]   BEQ   *+4 ;abs = 00af
+  00ad c601         [1]     LDAB  #1
+  00af 87           [1]     CLRA  
+  513:  }
+  00b0 1b81         [2]     LEAS  1,SP
+  00b2 3d           [5]     RTS   
+  00b3 37           [2]     PSHB  
+  00b4 ec88         [3]     LDD   8,SP
+  00b6 ee86         [3]     LDX   6,SP
+  00b8 160000       [4]     JSR   send_cmd
+  00bb 1b81         [2]     LEAS  1,SP
+  00bd 3d           [5]     RTS   
+  514:  
+  515:  
+  516:  //*************** eDisk_WriteBlock ***********
+  517:  // Write 1 block of 512 bytes of data to the SD card
+  518:  // Inputs: pointer to RAM buffer with information
+  519:  //         sector number of SD card to write: 0,1,2,...
+  520:  // Outputs: result
+  521:  //  RES_OK        0: Successful 
+  522:  //  RES_ERROR     1: R/W Error 
+  523:  //  RES_WRPRT     2: Write Protected 
+  524:  //  RES_NOTRDY    3: Not Ready 
+  525:  //  RES_PARERR    4: Invalid Parameter 
+  526:  DRESULT eDisk_WriteBlock (
+  527:    const BYTE *buff,   /* Pointer to the data to be written */
+  528:    DWORD sector        /* Start sector number (LBA) */
+  529:  ){ 
+*** EVALUATION ***
+
+Function: eDisk_WriteBlock
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 3b           [2]     PSHD  
+  0001 34           [2]     PSHX  
+  530:    return eDisk_Write(0,buff,sector,1);  // 1 block
+  0002 c7           [1]     CLRB  
+  0003 37           [2]     PSHB  
+  0004 ec87         [3]     LDD   7,SP
+  0006 3b           [2]     PSHD  
+  0007 ec85         [3]     LDD   5,SP
+  0009 3b           [2]     PSHD  
+  000a 34           [2]     PSHX  
+  000b c601         [1]     LDAB  #1
+  000d 160000       [4]     JSR   eDisk_Write
+  0010 1b87         [2]     LEAS  7,SP
+  531:  }
+  0012 1b84         [2]     LEAS  4,SP
+  0014 3d           [5]     RTS   
+  532:  
+  533:  #endif /* _READONLY */
+  534:  
+  535:  
+  536:  
+  537:  /*-----------------------------------------------------------------------*/
+  538:  /* Miscellaneous Functions                                               */
+  539:  /*-----------------------------------------------------------------------*/
+  540:  
+  541:  DRESULT disk_ioctl (
+  542:    BYTE drv,        /* Physical drive nmuber (0) */
+  543:    BYTE ctrl,        /* Control code */
+  544:    void *buff        /* Buffer to send/receive control data */
+  545:  ) {
+*** EVALUATION ***
+
+Function: disk_ioctl
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  0000 1bf1eb       [2]     LEAS  -21,SP
+  0003 3b           [2]     PSHD  
+  546:    DRESULT res;
+  547:    BYTE n, csd[16], *ptr = buff;
+  0004 6c84         [2]     STD   4,SP
+  548:    WORD csize;
+  549:  
+  550:  
+  551:    if (drv) return RES_PARERR;
+  0006 e6f01a       [3]     LDAB  26,SP
+  0009 2705         [3/1]   BEQ   *+7 ;abs = 0010
+  000b c604         [1]     LDAB  #4
+  000d 87           [1]     CLRA  
+  000e 2044         [3]     BRA   *+70 ;abs = 0054
+  552:  
+  553:    res = RES_ERROR;
+  0010 c601         [1]     LDAB  #1
+  0012 87           [1]     CLRA  
+  0013 6c82         [2]     STD   2,SP
+  554:  
+  555:    if (ctrl == CTRL_POWER) {
+  0015 e6f019       [3]     LDAB  25,SP
+  0018 c105         [1]     CMPB  #5
+  001a 2631         [3/1]   BNE   *+51 ;abs = 004d
+  556:      switch (*ptr) {
+  001c ee84         [3]     LDX   4,SP
+  001e e600         [3]     LDAB  0,X
+  0020 c102         [1]     CMPB  #2
+  0022 2221         [3/1]   BHI   *+35 ;abs = 0045
+  0024 160000       [4]     JSR   _CASE_CHECKED_BYTE
+  0027 03           DC.B  3
+  0028 1c           DC.B  28
+  0029 03           DC.B  3
+  002a 0e           DC.B  14
+  002b 13           DC.B  19
+  557:        case 0:        /* Sub control code == 0 (POWER_OFF) */
+  558:          if (chk_power())
+  002c 160000       [4]     JSR   chk_power
+  002f 044411       [3]     TBEQ  D,*+20 ;abs = 0043
+  559:            power_off();        /* Power off */
+  0032 160000       [4]     JSR   power_off
+  560:          res = RES_OK;
+  561:          break;
+  0035 200c         [3]     BRA   *+14 ;abs = 0043
+  562:        case 1:        /* Sub control code == 1 (POWER_ON) */
+  563:          power_on();                /* Power on */
+  0037 160000       [4]     JSR   power_on
+  564:          res = RES_OK;
+  565:          break;
+  003a 2007         [3]     BRA   *+9 ;abs = 0043
+  566:        case 2:        /* Sub control code == 2 (POWER_GET) */
+  567:          *(ptr+1) = (BYTE)chk_power();
+  003c 160000       [4]     JSR   chk_power
+  003f ee84         [3]     LDX   4,SP
+  0041 6b01         [2]     STAB  1,X
+  568:          res = RES_OK;
+  0043 c7           [1]     CLRB  
+  569:          break;
+  0044 8f           [2]     SKIP2 
+  570:        default :
+  571:          res = RES_PARERR;
+  0045 c604         [1]     LDAB  #4
+  0047 87           [1]     CLRA  
+  0048 6c82         [2]     STD   2,SP
+  572:      }
+  573:    }
+  004a 060000       [3]     JMP   disk_ioctl:0x015a
+  574:    else {
+  575:      if (Stat & STA_NOINIT) return RES_NOTRDY;
+  004d 1f00000105   [5]     BRCLR Stat,#1,*+10 ;abs = 0057
+  0052 c603         [1]     LDAB  #3
+  0054 060000       [3]     JMP   disk_ioctl:0x015c
+  576:  
+  577:      SELECT();        /* CS = L */
+  0057 160000       [4]     JSR   SELECT
+  578:  
+  579:      switch (ctrl) {
+  005a e6f019       [3]     LDAB  25,SP
+  005d c10d         [1]     CMPB  #13
+  005f 2216         [3/1]   BHI   *+24 ;abs = 0077
+  0061 d7           [1]     TSTB  
+  0062 250d         [3/1]   BCS   *+15 ;abs = 0071
+  0064 c102         [1]     CMPB  #2
+  0066 2207         [3/1]   BHI   *+9 ;abs = 006f
+  0068 87           [1]     CLRA  
+  0069 160000       [4]     JSR   _CASE_DIRECT_BYTE
+  006c a0           DC.B  160
+  006d 18           DC.B  24
+  006e 97           DC.B  151
+  006f c10b         [1]     CMPB  #11
+  0071 182500da     [4/3]   LBCS  *+222 ;abs = 014f
+  0075 c10d         [1]     CMPB  #13
+  0077 182200d4     [4/3]   LBHI  *+216 ;abs = 014f
+  007b c00b         [1]     SUBB  #11
+  007d 87           [1]     CLRA  
+  007e 160000       [4]     JSR   _CASE_DIRECT_BYTE
+  0081 93           DC.B  147
+  0082 a1           DC.B  161
+  0083 b0           DC.B  176
+  580:        case GET_SECTOR_COUNT :    /* Get number of sectors on the disk (DWORD) */
+  581:          if ((send_cmd(CMD9, 0) == 0) && rcvr_datablock(csd, 16)) {
+  0084 c649         [1]     LDAB  #73
+  0086 160000       [4]     JSR   disk_ioctl:0x0160
+  0089 0461c8       [3]     TBNE  B,*+203 ;abs = 0154
+  008c 1a87         [2]     LEAX  7,SP
+  008e 34           [2]     PSHX  
+  008f c610         [1]     LDAB  #16
+  0091 87           [1]     CLRA  
+  0092 160000       [4]     JSR   rcvr_datablock
+  0095 1b82         [2]     LEAS  2,SP
+  0097 0441ba       [3]     TBEQ  B,*+189 ;abs = 0154
+  582:            if ((csd[0] >> 6) == 1) {    /* SDC ver 2.00 */
+  009a e687         [3]     LDAB  7,SP
+  009c 8606         [1]     LDAA  #6
+  009e 160000       [4]     JSR   _BSHRU
+  00a1 042119       [3]     DBNE  B,*+28 ;abs = 00bd
+  583:              csize = csd[9] + ((WORD)csd[8] << 8) + 1;
+  00a4 e68f         [3]     LDAB  15,SP
+  00a6 b710         [1]     TFR   B,A
+  00a8 c7           [1]     CLRB  
+  00a9 b745         [1]     TFR   D,X
+  00ab e6f010       [3]     LDAB  16,SP
+  00ae 87           [1]     CLRA  
+  00af 1ae6         [2]     LEAX  D,X
+  584:              *(DWORD*)buff = (DWORD)csize << 10;
+  00b1 08           [1]     INX   
+  00b2 c60a         [1]     LDAB  #10
+  00b4 b756         [1]     TFR   X,Y
+  00b6 b705         [1]     SEX   A,X
+  00b8 160000       [4]     JSR   disk_ioctl:0x0177
+  585:            } else {                    /* MMC or SDC ver 1.XX */
+  00bb 2071         [3]     BRA   *+115 ;abs = 012e
+  586:              n = (csd[5] & 15) + ((csd[10] & 128) >> 7) + ((csd[9] & 3) << 1) + 2;
+  00bd e6f011       [3]     LDAB  17,SP
+  00c0 c480         [1]     ANDB  #128
+  00c2 8607         [1]     LDAA  #7
+  00c4 160000       [4]     JSR   _BSHRU
+  00c7 a68c         [3]     LDAA  12,SP
+  00c9 840f         [1]     ANDA  #15
+  00cb 1806         [2]     ABA   
+  00cd e6f010       [3]     LDAB  16,SP
+  00d0 c403         [1]     ANDB  #3
+  00d2 58           [1]     LSLB  
+  00d3 1806         [2]     ABA   
+  00d5 8b02         [1]     ADDA  #2
+  587:              csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) + ((WORD)(csd[6] & 3) << 10) + 1;
+  00d7 e68f         [3]     LDAB  15,SP
+  00d9 36           [2]     PSHA  
+  00da 8606         [1]     LDAA  #6
+  00dc 160000       [4]     JSR   _BSHRU
+  00df b745         [1]     TFR   D,X
+  00e1 e68f         [3]     LDAB  15,SP
+  00e3 59           [1]     LSLD  
+  00e4 59           [1]     LSLD  
+  00e5 1ae6         [2]     LEAX  D,X
+  00e7 e68e         [3]     LDAB  14,SP
+  00e9 c403         [1]     ANDB  #3
+  00eb 87           [1]     CLRA  
+  00ec b746         [1]     TFR   D,Y
+  00ee 8604         [1]     LDAA  #4
+  00f0 c7           [1]     CLRB  
+  00f1 13           [3]     EMUL  
+  00f2 1ae6         [2]     LEAX  D,X
+  588:              *(DWORD*)buff = (DWORD)csize << (n - 9);
+  00f4 33           [3]     PULB  
+  00f5 87           [1]     CLRA  
+  00f6 830009       [2]     SUBD  #9
+  00f9 08           [1]     INX   
+  00fa b756         [1]     TFR   X,Y
+  00fc ce0000       [2]     LDX   #0
+  00ff 0776         [4]     BSR   *+120 ;abs = 0177
+  0101 202b         [3]     BRA   *+45 ;abs = 012e
+  589:            }
+  590:            res = RES_OK;
+  591:          }
+  592:          break;
+  593:  
+  594:        case GET_SECTOR_SIZE :    /* Get sectors on the disk (WORD) */
+  595:          *(WORD*)buff = 512;
+  0103 ee80         [3]     LDX   0,SP
+  0105 8602         [1]     LDAA  #2
+  0107 c7           [1]     CLRB  
+  0108 6c00         [2]     STD   0,X
+  596:          res = RES_OK;
+  597:          break;
+  010a 2022         [3]     BRA   *+36 ;abs = 012e
+  598:  
+  599:        case CTRL_SYNC :    /* Make sure that data has been written */
+  600:          if (wait_ready() == 0xFF)
+  010c 160000       [4]     JSR   wait_ready
+  010f 04a142       [3]     IBNE  B,*+69 ;abs = 0154
+  0112 201a         [3]     BRA   *+28 ;abs = 012e
+  601:            res = RES_OK;
+  602:          break;
+  603:  
+  604:        case MMC_GET_CSD :    /* Receive CSD as a data block (16 bytes) */
+  605:          if (send_cmd(CMD9, 0) == 0        /* READ_CSD */
+  0114 c649         [1]     LDAB  #73
+  0116 0748         [4]     BSR   *+74 ;abs = 0160
+  0118 046139       [3]     TBNE  B,*+60 ;abs = 0154
+  606:               && rcvr_datablock(ptr, 16))
+  011b 074e         [4]     BSR   *+80 ;abs = 016b
+  011d 044134       [3]     TBEQ  B,*+55 ;abs = 0154
+  0120 200c         [3]     BRA   *+14 ;abs = 012e
+  607:            res = RES_OK;
+  608:          break;
+  609:  
+  610:        case MMC_GET_CID :    /* Receive CID as a data block (16 bytes) */
+  611:          if (send_cmd(CMD10, 0) == 0        /* READ_CID */
+  0122 c64a         [1]     LDAB  #74
+  0124 073a         [4]     BSR   *+60 ;abs = 0160
+  0126 04612b       [3]     TBNE  B,*+46 ;abs = 0154
+  612:               && rcvr_datablock(ptr, 16))
+  0129 0740         [4]     BSR   *+66 ;abs = 016b
+  012b 044126       [3]     TBEQ  B,*+41 ;abs = 0154
+  613:            res = RES_OK;
+  012e c7           [1]     CLRB  
+  012f 2020         [3]     BRA   *+34 ;abs = 0151
+  614:          break;
+  615:  
+  616:        case MMC_GET_OCR :    /* Receive OCR as an R3 resp (4 bytes) */
+  617:          if (send_cmd(CMD58, 0) == 0) {    /* READ_OCR */
+  0131 c67a         [1]     LDAB  #122
+  0133 072b         [4]     BSR   *+45 ;abs = 0160
+  0135 046117       [3]     TBNE  B,*+26 ;abs = 014f
+  618:            for (n = 0; n < 4; n++)
+  0138 6986         [2]     CLR   6,SP
+  619:              *ptr++ = rcvr_spi();
+  013a ee84         [3]     LDX   4,SP
+  013c 1901         [2]     LEAY  1,X
+  013e 6d84         [2]     STY   4,SP
+  0140 34           [2]     PSHX  
+  0141 160000       [4]     JSR   rcvr_spi
+  0144 30           [3]     PULX  
+  0145 6b00         [2]     STAB  0,X
+  0147 6286         [3]     INC   6,SP
+  0149 e686         [3]     LDAB  6,SP
+  014b c104         [1]     CMPB  #4
+  014d 25eb         [3/1]   BCS   *-19 ;abs = 013a
+  620:            res = RES_OK;
+  621:          }
+  622:  
+  623:  //        case MMC_GET_TYPE :    /* Get card type flags (1 byte) */
+  624:  //            *ptr = CardType;
+  625:  //            res = RES_OK;
+  626:  //            break;
+  627:  
+  628:        default:
+  629:          res = RES_PARERR;
+  014f c604         [1]     LDAB  #4
+  0151 87           [1]     CLRA  
+  0152 6c82         [2]     STD   2,SP
+  630:      }
+  631:  
+  632:      DESELECT();            /* CS = H */
+  0154 160000       [4]     JSR   DESELECT
+  633:      rcvr_spi();            /* Idle (Release DO) */
+  0157 160000       [4]     JSR   rcvr_spi
+  634:    }
+  635:    return res;
+  015a ec82         [3]     LDD   2,SP
+  636:  }
+  015c 1bf017       [2]     LEAS  23,SP
+  015f 3d           [5]     RTS   
+  0160 37           [2]     PSHB  
+  0161 c7           [1]     CLRB  
+  0162 87           [1]     CLRA  
+  0163 b745         [1]     TFR   D,X
+  0165 160000       [4]     JSR   send_cmd
+  0168 1b81         [2]     LEAS  1,SP
+  016a 3d           [5]     RTS   
+  016b ec86         [3]     LDD   6,SP
+  016d 3b           [2]     PSHD  
+  016e c610         [1]     LDAB  #16
+  0170 87           [1]     CLRA  
+  0171 160000       [4]     JSR   rcvr_datablock
+  0174 1b82         [2]     LEAS  2,SP
+  0176 3d           [5]     RTS   
+  0177 160000       [4]     JSR   _LSHL
+  017a ed82         [3]     LDY   2,SP
+  017c 6e40         [2]     STX   0,Y
+  017e 6c42         [2]     STD   2,Y
+  0180 3d           [5]     RTS   
+  637:  
+  638:  
+  639:  
+  640:  /*-----------------------------------------------------------------------*/
+  641:  /* Device Timer Interrupt Procedure  (Platform dependent)                */
+  642:  /*-----------------------------------------------------------------------*/
+  643:  /* This function must be called in period of 10ms                        */
+  644:  interrupt 8 void TOC0handler(void){ // executes at 100 Hz 
+*** EVALUATION ***
+
+Function: TOC0handler
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  645:    BYTE n;
+  646:    TFLG1 = 0x01;         // acknowledge OC0
+  0000 c601         [1]     LDAB  #1
+  0002 5b00         [2]     STAB  _TFLG1
+  647:    TC0 = TC0+TIME_10MS;  // 10 ms
+  0004 dc00         [3]     LDD   _TC0
+  0006 c30753       [2]     ADDD  #1875
+  0009 5c00         [2]     STD   _TC0
+  648:    n = Timer1;            /* 100Hz decrement timer */
+  000b f60000       [3]     LDAB  Timer1
+  000e 6baf         [2]     STAB  1,-SP
+  649:    if (n) Timer1 = --n;
+  0010 2707         [3/1]   BEQ   *+9 ;abs = 0019
+  0012 6380         [3]     DEC   0,SP
+  0014 e680         [3]     LDAB  0,SP
+  0016 7b0000       [3]     STAB  Timer1
+  650:    n = Timer2;
+  0019 f60000       [3]     LDAB  Timer2
+  001c 6b80         [2]     STAB  0,SP
+  651:    if (n) Timer2 = --n;
+  001e 2707         [3/1]   BEQ   *+9 ;abs = 0027
+  0020 6380         [3]     DEC   0,SP
+  0022 e680         [3]     LDAB  0,SP
+  0024 7b0000       [3]     STAB  Timer2
+  652:  }
+  0027 32           [3]     PULA  
+  0028 0b           [8]     RTI   
+  653:  
+  654:  /*---------------------------------------------------------*/
+  655:  /* User Provided Timer Function for FatFs module           */
+  656:  /*---------------------------------------------------------*/
+  657:  /* This is a real time clock service to be called from     */
+  658:  /* FatFs module. Any valid time must be returned even if   */
+  659:  /* the system does not support a real time clock.          */
+  660:  
+  661:  DWORD get_fattime (void) {
+*** EVALUATION ***
+
+Function: get_fattime
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\edisk.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\edisk.c.o" -WmsgSd1106
+
+  662:  
+  663:      return    ((2007UL-1980) << 25)  // Year = 2007
+  0000 cc5cc0       [2]     LDD   #23744
+  0003 ce36c5       [2]     LDX   #14021
+  664:              | (6UL << 21)            // Month = June
+  665:              | (5UL << 16)            // Day = 5
+  666:              | (11U << 11)            // Hour = 11
+  667:              | (38U << 5)             // Min = 38
+  668:              | (0U >> 1)              // Sec = 0
+  669:              ;
+  670:  
+  671:  }
+  0006 3d           [5]     RTS   
+  672:  

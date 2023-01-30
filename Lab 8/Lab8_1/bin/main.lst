@@ -1,0 +1,368 @@
+*** EVALUATION ***
+ANSI-C/cC++ Compiler for HC12 V-5.0.38 Build 9056, Feb 26 2009
+
+    1:  // Jonathan Valvano
+    2:  // SDC test programs
+    3:  // May 2, 2011
+    4:  // TestDisk tests low level eDisk (will destroy format)
+    5:  // to test the FAT file syste,
+    6:  //   1) format a SDC on another system
+    7:  //   2) run CreateTest to create a new file
+    8:  //   3) run ReadTest to read that file back
+    9:  #include <hidef.h>      /* common defines and macros */
+   10:  #include "derivative.h" /* derivative-specific definitions */
+   11:  
+   12:  #include "pll.h"
+   13:  #include "edisk.h"
+   14:  #include "ff.h"
+   15:  unsigned char buffer[512];
+   16:  void error(void){unsigned short startTime; 
+*** EVALUATION ***
+
+Function: error
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\main.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\main.c.o" -WmsgSd1106
+
+  0000 3b           [2]     PSHD  
+   17:    for(;;){
+   18:      PTP ^= 0x80;         // TCNT = 5.333us
+  0001 f60000       [3]     LDAB  _PTP
+  0004 c880         [1]     EORB  #128
+  0006 7b0000       [3]     STAB  _PTP
+   19:      startTime = TCNT;    // 4 Hz
+  0009 dc00         [3]     LDD   _TCNT
+  000b 6c80         [2]     STD   0,SP
+   20:      while((TCNT-startTime) <= 46875){}  
+  000d dc00         [3]     LDD   _TCNT
+  000f a380         [3]     SUBD  0,SP
+  0011 8cb71b       [2]     CPD   #46875
+  0014 23f7         [3/1]   BLS   *-7 ;abs = 000d
+  0016 20e9         [3]     BRA   *-21 ;abs = 0001
+   21:    }
+   22:  }
+   23:  #define MAXBLOCKS 1000
+   24:  
+   25:  void TestDisk(void){  DSTATUS result;  unsigned short block;  int i; unsigned long n;
+*** EVALUATION ***
+
+Function: TestDisk
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\main.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\main.c.o" -WmsgSd1106
+
+  0000 1b98         [2]     LEAS  -8,SP
+   26:    // simple test of eDisk
+   27:    DDRP |= 0x80;
+  0002 1c000080     [4]     BSET  _DDRP,#128
+   28:    DDRT = 0xFF;
+  0006 c6ff         [1]     LDAB  #255
+  0008 7b0000       [3]     STAB  _DDRT
+   29:    PTT = 0;
+  000b 790000       [3]     CLR   _PTT
+   30:    result = eDisk_Init(0);  // initialize disk
+  000e c7           [1]     CLRB  
+  000f 160000       [4]     JSR   eDisk_Init
+   31:    if(result) { 
+  0012 044107       [3]     TBEQ  B,*+10 ;abs = 001c
+   32:      PTT = 1;
+  0015 c601         [1]     LDAB  #1
+  0017 160000       [4]     JSR   TestDisk:0x00c2
+   33:      error();
+   34:      for(;;){
+  001a 20fe         [3]     BRA   *+0 ;abs = 001a
+   35:      };
+   36:    }
+   37:    n = 1;    // seed
+  001c 160000       [4]     JSR   TestDisk:0x00c8
+   38:    for(block = 0; block < MAXBLOCKS; block++){
+   39:      for(i=0;i<512;i++){
+  001f c7           [1]     CLRB  
+  0020 87           [1]     CLRA  
+  0021 6c86         [2]     STD   6,SP
+   40:        n = (16807*n)%2147483647; // pseudo random sequence
+  0023 077f         [4]     BSR   *+129 ;abs = 00a4
+   41:        buffer[i] = 0xFF&n;        
+  0025 6be20000     [3]     STAB  buffer,X
+  0029 08           [1]     INX   
+  002a 6e86         [2]     STX   6,SP
+  002c ce0000       [2]     LDX   #0
+  002f ec86         [3]     LDD   6,SP
+  0031 8c0200       [2]     CPD   #512
+  0034 2ded         [3/1]   BLT   *-17 ;abs = 0023
+   42:      }
+   43:      PTT = 0x08;     // PT3 high for 100 block writes
+  0036 c608         [1]     LDAB  #8
+  0038 7b0000       [3]     STAB  _PTT
+   44:      if(eDisk_WriteBlock(buffer,block)){ 
+  003b cc0000       [2]     LDD   #buffer
+  003e 3b           [2]     PSHD  
+  003f ec86         [3]     LDD   6,SP
+  0041 160000       [4]     JSR   eDisk_WriteBlock
+  0044 1b82         [2]     LEAS  2,SP
+  0046 044406       [3]     TBEQ  D,*+9 ;abs = 004f
+   45:        PTT = 2;
+  0049 c602         [1]     LDAB  #2
+  004b 0775         [4]     BSR   *+119 ;abs = 00c2
+   46:        error();
+   47:        for(;;){
+  004d 20fe         [3]     BRA   *+0 ;abs = 004d
+   48:        };
+   49:      }
+   50:      PTT = 0x00;     
+  004f 790000       [3]     CLR   _PTT
+  0052 ee84         [3]     LDX   4,SP
+  0054 08           [1]     INX   
+  0055 6e84         [2]     STX   4,SP
+  0057 8e03e8       [2]     CPX   #1000
+  005a 25c3         [3/1]   BCS   *-59 ;abs = 001f
+   51:    }  
+   52:    n = 1;  // reseed, start over to get the same sequence
+  005c 076a         [4]     BSR   *+108 ;abs = 00c8
+   53:    for(block = 0; block < MAXBLOCKS; block++){
+   54:      PTT = 0x04;     // PT2 high for one block read
+  005e c604         [1]     LDAB  #4
+  0060 7b0000       [3]     STAB  _PTT
+   55:      if(eDisk_ReadBlock(buffer,block)){ 
+  0063 cc0000       [2]     LDD   #buffer
+  0066 3b           [2]     PSHD  
+  0067 ec86         [3]     LDD   6,SP
+  0069 ce0000       [2]     LDX   #0
+  006c 160000       [4]     JSR   eDisk_ReadBlock
+  006f 1b82         [2]     LEAS  2,SP
+  0071 044406       [3]     TBEQ  D,*+9 ;abs = 007a
+   56:        PTT = 3;
+  0074 c603         [1]     LDAB  #3
+  0076 074a         [4]     BSR   *+76 ;abs = 00c2
+   57:        error();
+   58:        for(;;){
+  0078 20fe         [3]     BRA   *+0 ;abs = 0078
+   59:        };
+   60:      }
+   61:      PTT = 0x00;
+  007a 790000       [3]     CLR   _PTT
+   62:      for(i=0;i<512;i++){
+  007d c7           [1]     CLRB  
+  007e 87           [1]     CLRA  
+  007f 6c86         [2]     STD   6,SP
+   63:        n = (16807*n)%2147483647; // pseudo random sequence
+  0081 0721         [4]     BSR   *+35 ;abs = 00a4
+   64:        if(buffer[i] != (0xFF&n)){ 
+  0083 e1e20000     [4]     CMPB  buffer,X
+  0087 2706         [3/1]   BEQ   *+8 ;abs = 008f
+   65:          PTT = 0x10;
+  0089 c610         [1]     LDAB  #16
+  008b 0735         [4]     BSR   *+55 ;abs = 00c2
+   66:          error();
+   67:          for(;;){
+  008d 20fe         [3]     BRA   *+0 ;abs = 008d
+  008f 08           [1]     INX   
+  0090 6e86         [2]     STX   6,SP
+  0092 8e0200       [2]     CPX   #512
+  0095 2dea         [3/1]   BLT   *-20 ;abs = 0081
+  0097 ee84         [3]     LDX   4,SP
+  0099 08           [1]     INX   
+  009a 6e84         [2]     STX   4,SP
+  009c 8e03e8       [2]     CPX   #1000
+  009f 25bd         [3/1]   BCS   *-65 ;abs = 005e
+   68:          };
+   69:        }     
+   70:      }
+   71:    }  
+   72:  }
+  00a1 1b88         [2]     LEAS  8,SP
+  00a3 3d           [5]     RTS   
+  00a4 ec84         [3]     LDD   4,SP
+  00a6 ee82         [3]     LDX   2,SP
+  00a8 cd41a7       [2]     LDY   #16807
+  00ab 160000       [4]     JSR   _LMULU16x32
+  00ae cdffff       [2]     LDY   #65535
+  00b1 35           [2]     PSHY  
+  00b2 cd7fff       [2]     LDY   #32767
+  00b5 35           [2]     PSHY  
+  00b6 160000       [4]     JSR   _LMODU
+  00b9 6c84         [2]     STD   4,SP
+  00bb 6e82         [2]     STX   2,SP
+  00bd ee88         [3]     LDX   8,SP
+  00bf e685         [3]     LDAB  5,SP
+  00c1 3d           [5]     RTS   
+  00c2 7b0000       [3]     STAB  _PTT
+  00c5 060000       [3]     JMP   error
+  00c8 c601         [1]     LDAB  #1
+  00ca 87           [1]     CLRA  
+  00cb 6c84         [2]     STD   4,SP
+  00cd c7           [1]     CLRB  
+  00ce 6c82         [2]     STD   2,SP
+  00d0 6c86         [2]     STD   6,SP
+  00d2 3d           [5]     RTS   
+   73:  
+   74:  static FATFS g_sFatFs;
+   75:  FIL Handle,Handle2;
+   76:  void ReadTest(void){   int i;  UINT n;
+*** EVALUATION ***
+
+Function: ReadTest
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\main.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\main.c.o" -WmsgSd1106
+
+   77:    FRESULT fresult;
+   78:  // assumes there is a short text file named file5.txt
+   79:    fresult = f_open(&Handle,"file5.txt", FA_READ);
+  0000 cc0000       [2]     LDD   #Handle
+  0003 6caa         [2]     STD   6,-SP
+  0005 ce0000       [2]     LDX   #"file5.txt"
+  0008 34           [2]     PSHX  
+  0009 c601         [1]     LDAB  #1
+  000b 160000       [4]     JSR   f_open
+  000e 1b84         [2]     LEAS  4,SP
+   80:    if(fresult) error();
+  0010 044403       [3]     TBEQ  D,*+6 ;abs = 0016
+  0013 160000       [4]     JSR   error
+   81:    i=0;
+  0016 c7           [1]     CLRB  
+  0017 87           [1]     CLRA  
+  0018 6c80         [2]     STD   0,SP
+   82:    do{
+   83:      fresult = f_read(&Handle,&buffer[i],1,&n);
+  001a cc0000       [2]     LDD   #Handle
+  001d 3b           [2]     PSHD  
+  001e ee82         [3]     LDX   2,SP
+  0020 1ae20000     [2]     LEAX  buffer,X
+  0024 34           [2]     PSHX  
+  0025 c601         [1]     LDAB  #1
+  0027 87           [1]     CLRA  
+  0028 3b           [2]     PSHD  
+  0029 1a88         [2]     LEAX  8,SP
+  002b b754         [1]     TFR   X,D
+  002d 160000       [4]     JSR   f_read
+  0030 1b86         [2]     LEAS  6,SP
+   84:      if(fresult) error();
+  0032 044403       [3]     TBEQ  D,*+6 ;abs = 0038
+  0035 160000       [4]     JSR   error
+   85:      i++;
+  0038 ee80         [3]     LDX   0,SP
+  003a 08           [1]     INX   
+  003b 6e80         [2]     STX   0,SP
+   86:    } while((n==1)&&(i<511));
+  003d ec82         [3]     LDD   2,SP
+  003f 042405       [3]     DBNE  D,*+8 ;abs = 0047
+  0042 8e01ff       [2]     CPX   #511
+  0045 2dd3         [3/1]   BLT   *-43 ;abs = 001a
+   87:    buffer[i] = 0; // null termination
+  0047 69e20000     [3]     CLR   buffer,X
+   88:    fresult = f_close(&Handle);
+  004b cc0000       [2]     LDD   #Handle
+  004e 160000       [4]     JSR   f_close
+   89:    if(fresult) error();
+  0051 044403       [3]     TBEQ  D,*+6 ;abs = 0057
+  0054 160000       [4]     JSR   error
+   90:  }
+  0057 1b84         [2]     LEAS  4,SP
+  0059 3d           [5]     RTS   
+   91:  void CreateTest(void){ int i;  UINT n; char letter;
+*** EVALUATION ***
+
+Function: CreateTest
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\main.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\main.c.o" -WmsgSd1106
+
+   92:    FRESULT fresult;
+   93:  // Creates a new file named file5.txt makes it empty
+   94:    fresult = f_open(&Handle2,"file5.txt", FA_CREATE_ALWAYS|FA_WRITE);
+  0000 cc0000       [2]     LDD   #Handle2
+  0003 6ca9         [2]     STD   7,-SP
+  0005 ce0000       [2]     LDX   #"file5.txt"
+  0008 34           [2]     PSHX  
+  0009 c60a         [1]     LDAB  #10
+  000b 160000       [4]     JSR   f_open
+  000e 1b84         [2]     LEAS  4,SP
+   95:    if(fresult) error();
+  0010 044403       [3]     TBEQ  D,*+6 ;abs = 0016
+  0013 160000       [4]     JSR   error
+   96:    i=0;
+  0016 c7           [1]     CLRB  
+  0017 87           [1]     CLRA  
+  0018 6c81         [2]     STD   1,SP
+   97:    do{
+   98:      if((i%10) == 9) letter = 13;
+  001a ec81         [3]     LDD   1,SP
+  001c ce000a       [2]     LDX   #10
+  001f 1815         [12]    IDIVS 
+  0021 8c0009       [2]     CPD   #9
+  0024 2604         [3/1]   BNE   *+6 ;abs = 002a
+  0026 c60d         [1]     LDAB  #13
+  0028 200a         [3]     BRA   *+12 ;abs = 0034
+   99:      else if ((i%10) == 10) letter = 10;
+  002a 8c000a       [2]     CPD   #10
+  002d 2603         [3/1]   BNE   *+5 ;abs = 0032
+  002f c60a         [1]     LDAB  #10
+  0031 8f           [2]     SKIP2 
+  100:      else letter = (i%10)+'a';
+  0032 cb61         [1]     ADDB  #97
+  0034 6b80         [2]     STAB  0,SP
+  101:      fresult = f_write(&Handle2,&letter,1,&n);
+  0036 cc0000       [2]     LDD   #Handle2
+  0039 3b           [2]     PSHD  
+  003a 1a82         [2]     LEAX  2,SP
+  003c 34           [2]     PSHX  
+  003d c601         [1]     LDAB  #1
+  003f 87           [1]     CLRA  
+  0040 3b           [2]     PSHD  
+  0041 1a89         [2]     LEAX  9,SP
+  0043 b754         [1]     TFR   X,D
+  0045 160000       [4]     JSR   f_write
+  0048 1b86         [2]     LEAS  6,SP
+  102:      if(fresult) error();
+  004a 044403       [3]     TBEQ  D,*+6 ;abs = 0050
+  004d 160000       [4]     JSR   error
+  103:      i++;
+  0050 ee81         [3]     LDX   1,SP
+  0052 08           [1]     INX   
+  0053 6e81         [2]     STX   1,SP
+  104:    } while((n==1)&&(i<511));
+  0055 ec83         [3]     LDD   3,SP
+  0057 042405       [3]     DBNE  D,*+8 ;abs = 005f
+  005a 8e01ff       [2]     CPX   #511
+  005d 2dbb         [3/1]   BLT   *-67 ;abs = 001a
+  105:    fresult = f_close(&Handle2);
+  005f cc0000       [2]     LDD   #Handle2
+  0062 160000       [4]     JSR   f_close
+  106:    if(fresult) error();
+  0065 044403       [3]     TBEQ  D,*+6 ;abs = 006b
+  0068 160000       [4]     JSR   error
+  107:  }
+  006b 1b85         [2]     LEAS  5,SP
+  006d 3d           [5]     RTS   
+  108:  
+  109:  void main(void) { 
+*** EVALUATION ***
+
+Function: main
+Source  : D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources\main.c
+Options : -Cc -CPUHCS12 -D_HCS12_SERIALMON -D__NO_FLOAT__ -Env"GENPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\prm;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\cmd;D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Env"TEXTPATH=D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\bin" -Lasm=%n.lst -Ms -ObjN="D:\My Dropbox\EE345L\9S12DP512\SDC_DP512\SDC_Data\Standard\ObjectCode\main.c.o" -WmsgSd1106
+
+  0000 3b           [2]     PSHD  
+  110:    FRESULT fresult;
+  111:    PLL_Init();
+  0001 160000       [4]     JSR   PLL_Init
+  112:  	EnableInterrupts;
+  0004 10ef         [1]     CLI   
+  113:  	DDRP |= 0x80;   // PP7 flashes on error
+  0006 1c000080     [4]     BSET  _DDRP,#128
+  114:    PTP &= ~0x80;   // PP7 on if ok
+  000a 1d000080     [4]     BCLR  _PTP,#128
+  115:    fresult = f_mount(0, &g_sFatFs);
+  000e c7           [1]     CLRB  
+  000f 37           [2]     PSHB  
+  0010 cc0000       [2]     LDD   #g_sFatFs
+  0013 160000       [4]     JSR   f_mount
+  0016 6ca0         [2]     STD   1,+SP
+  116:  //  TestDisk();   // tests edisk functions, will destroy formating
+  117:    CreateTest();   // tests creating a new file for writing
+  0018 160000       [4]     JSR   CreateTest
+  118:  //  ReadTest();   // tests reading a file
+  119:    PTP |= 0x80;    // PP7 on means ok
+  001b 1c000080     [4]     BSET  _PTP,#128
+  120:    for(;;) {
+  001f 20fe         [3]     BRA   *+0 ;abs = 001f
+  121:    } 
+  122:  }
+  123:  
